@@ -1,16 +1,10 @@
 #!/bin/bash
 set -e
 
-echo "=== 0. MIG 기본 설정 실행 중 ==="
-cd ~/MIG
-./setup_mig.sh
-sudo nvidia-smi mig -cgi 78,83 -C
-sleep 3
-
 echo "=== 1. 1g 타겟 MIG UUID 동적 추출 ==="
 MIG_UUID_1G=$(nvidia-smi -L | grep "MIG 1g.0gb" | awk -F'UUID: ' '{print $2}' | tr -d ')')
 
-echo "=== 2. [1g 파티션] Docker 지속 부하 시작 ==="
+echo "=== 2. [1g 파티션] Docker 하드웨어 레이턴시 측정 시작 ==="
 sudo docker run --rm -it --runtime nvidia \
     -e NVIDIA_VISIBLE_DEVICES="all" \
     -e CUDA_VISIBLE_DEVICES="$MIG_UUID_1G" \
@@ -21,14 +15,38 @@ sudo docker run --rm -it --runtime nvidia \
     --device /dev/nvidia-uvm \
     nvcr.io/nvidia/pytorch:25.08-py3 \
     python3 -c "
-import torch, time
-print('\n=== [1g 파티션] MIG 격리 증명용 지속 부하 테스트 시작 ===')
-a = torch.randn(5000, 5000, device='cuda')
-b = torch.randn(5000, 5000, device='cuda')
-count = 0
-while True:
+import torch
+
+print('\n=== [1g 파티션] 순수 GPU 하드웨어 레이턴시 측정 시작 ===')
+
+# 1. 텐서 초기화 (1g 메모리 한계 초과를 방지하기 위해 2000x2000 사용)
+a = torch.randn(2000, 2000, device='cuda')
+b = torch.randn(2000, 2000, device='cuda')
+
+# 2. CUDA 하드웨어 타이머 객체 생성
+start_event = torch.cuda.Event(enable_timing=True)
+end_event = torch.cuda.Event(enable_timing=True)
+
+# 3. 웜업 (CUDA 컨텍스트 초기화 병목 및 클럭 부스팅 대기)
+print('GPU 웜업 중...')
+for _ in range(10):
+    _ = torch.matmul(a, b)
+torch.cuda.synchronize()
+
+# 4. 순수 하드웨어 레이턴시 측정 (100회 반복)
+print('하드웨어 레이턴시 측정 진행 중...')
+start_event.record()
+
+for _ in range(100):
     c = torch.matmul(a, b)
-    count += 1
-    print(f'\r[1g] 현재 부하 연산 횟수: {count}', end='', flush=True)
-    time.sleep(0.01)
+
+end_event.record()
+torch.cuda.synchronize() # 하드웨어 타이머 기록이 끝날 때까지 CPU 대기
+
+# 5. 결과 출력
+elapsed_time_ms = start_event.elapsed_time(end_event)
+print('-' * 50)
+print(f'100회 연산 순수 GPU 소요 시간: {elapsed_time_ms:.3f} ms')
+print(f'1회 연산 평균 레이턴시: {elapsed_time_ms / 100:.3f} ms')
+print('-' * 50)
 "

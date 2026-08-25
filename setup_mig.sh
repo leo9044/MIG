@@ -18,6 +18,10 @@ echo "3. MIG 모드 활성화 중..."
 echo "$PASSWORD" | sudo -S nvidia-smi -mig 1
 
 echo "=== MIG 설정이 완료되었습니다 ==="
-echo "변경 사항을 적용하려면 GPU 프로세스를 종료하거나 시스템을 재부팅해야 할 수 있습니다."
 
-
+echo "=== 4. MIG 기본 설정 실행 중 ==="
+cd ~/MIG
+./setup_mig.sh
+sudo nvidia-smi mig -cgi 78,83 -C
+echo "=== 드라이버 안정화 대기 중... ==="
+sleep 3
