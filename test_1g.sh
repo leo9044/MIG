@@ -33,8 +33,15 @@ for _ in range(10):
     _ = torch.matmul(a, b)
 torch.cuda.synchronize()
 
+# --- 추가된 대기 로직 ---
+print('\n[✅ 초기화 완료] 메모리 대역폭 병목 구간을 무사히 통과했습니다.')
+print('-' * 70)
+input('>>> 터미널을 열어 2g 부하(test.sh)를 실행하세요. 부하가 시작되면 여기로 돌아와 [Enter]를 누르세요! <<<')
+print('-' * 70)
+# ------------------------
+
 # 4. 순수 하드웨어 레이턴시 측정 (100회 반복)
-print('하드웨어 레이턴시 측정 진행 중...')
+print('\n하드웨어 레이턴시 측정 진행 중...')
 start_event.record()
 
 for _ in range(100):
