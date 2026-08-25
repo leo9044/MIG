@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+echo "=== 0. MIG 기본 설정 실행 중 ==="
+cd ~/MIG
+./setup_mig.sh
+sudo nvidia-smi mig -cgi 78,83 -C
+sleep 3
+
 echo "=== 1. 1g 타겟 MIG UUID 동적 추출 ==="
 MIG_UUID_1G=$(nvidia-smi -L | grep "MIG 1g.0gb" | awk -F'UUID: ' '{print $2}' | tr -d ')')
 
