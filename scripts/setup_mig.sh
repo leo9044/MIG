@@ -24,7 +24,7 @@ sleep 3
 
 #4. 권장 프로파일 동시 생성 (83번=2g.0gb+gfx, 78번=1g.0gb+me)
 echo "4. 인스턴스 생성 중...(78번 단독생성시 오류 발생)"
-echo "$PASSWORD" | sudo -S nvidia-smi mig -cgi 83, 78 -C
+echo "$PASSWORD" | sudo -S nvidia-smi mig -cgi 83,78 -C
 
 echo "=== MIG 파티셔닝 완료 ==="
 echo "--------------------------------------------------"
