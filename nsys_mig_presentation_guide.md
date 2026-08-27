@@ -349,3 +349,63 @@ Nsight Systems 결과만으로도 실행 시간과 kernel 간섭을 설명할 �
 - No-MIG 단독, No-MIG 두 workload 동시 실행 결과
 - 각 조건 최소 3회 반복 결과
 - `RUN_SECONDS`가 동일한 raw report와 CSV summary
+
+## 9. MPS on/off 실험
+
+MPS는 MIG와 역할이 다르다. MIG는 GPU 자원을 하드웨어 인스턴스로 분할하고, MPS는 하나의 CUDA context에서 여러 client process의 kernel을 함께 스케줄링하도록 돕는다. 이번 구성에서는 MPS는 1g에만 적용하고 2g는 비교용 workload로 유지한다.
+
+### 원본 스크립트 평가
+
+`scripts/mps_test_1g.sh`는 1g MIG UUID를 찾고, MPS pipe/log 디렉터리를 만든 뒤 `nvidia-cuda-mps-control -d`를 실행하고 두 Python process를 동시에 시작한다. 따라서 MPS를 적용한다는 핵심 구조는 맞다. 하지만 `while True`와 `wait` 때문에 자동 종료되지 않고, process별 실행량과 latency를 기록하지 않으며, 실행 후 MPS daemon 정리가 없다.
+
+`scripts/mps_test_2g.sh`는 2g에서 CUDA event로 100회 matmul latency를 측정한다. 1g workload가 이미 실행 중이라는 전제에서는 유용하지만, 수동 실행 순서에 의존하고 측정 시간이 짧으며 반복 통계가 없다. 원본은 보존하고, 고정 시간 Nsight 측정은 `scripts/nsys_mps_compare.sh`가 담당한다.
+
+### MPS 측정 실행
+
+현재 MIG 인스턴스가 이미 설정된 상태에서는 다음 명령만 실행한다.
+
+```bash
+cd /home/leo/MIG
+MODE=all RUN_SECONDS=20 bash scripts/nsys_mps_compare.sh
+```
+
+이 명령은 다음 순서로 실행한다.
+
+1. 1g에서 MPS on, 두 client process를 시작한다.
+2. 2초 후 2g latency workload를 시작한다.
+3. MPS on 1g client를 각각 내부 Nsight로 프로파일링한다.
+4. 같은 방식으로 MPS off 조건을 반복한다.
+
+MPS on에서는 MPS server를 통해 실행되는 client를 바깥 Nsight가 안정적으로 추적하지 못할 수 있다. 그래서 1g의 두 client 각각에 컨테이너 내부 `nsys profile`을 직접 적용한다.
+
+생성 파일:
+
+```text
+nsys_mps_results/mps_1g_a.nsys-rep
+nsys_mps_results/mps_1g_b.nsys-rep
+nsys_mps_results/mps_2g.nsys-rep
+nsys_mps_results/nomps_1g.nsys-rep
+nsys_mps_results/nomps_2g.nsys-rep
+```
+
+### 이번 20초 결과
+
+| 조건 | report | 대표 kernel instances | 평균 kernel 시간 |
+|---|---|---:|---:|
+| MPS on, 1g client A | `mps_1g_a.nsys-rep` | 8,353 | 1.117 ms |
+| MPS on, 1g client B | `mps_1g_b.nsys-rep` | 8,383 | 1.110 ms |
+| MPS off, 1g 두 process 합계 | `nomps_1g.nsys-rep` | 11,912 | 3.105 ms |
+| MPS on, 2g | `mps_2g.nsys-rep` | 37,635 | 0.400 ms |
+| MPS off, 2g | `nomps_2g.nsys-rep` | 34,713 | 0.446 ms |
+
+1g에서는 MPS on의 두 client가 각각 약 8.3k kernel을 실행해 합계 약 16.7k회를 기록했다. MPS off는 두 process가 하나의 CUDA 실행 흐름에서 경쟁하면서 합계 11.9k회, 평균 3.105ms로 측정됐다. 이 결과는 MPS가 같은 MIG 인스턴스 안의 여러 process를 더 균등하고 효율적으로 스케줄링할 수 있다는 근거다.
+
+2g에서는 MPS on/off가 모두 1g와 다른 MIG 인스턴스에서 실행된다. 두 조건의 차이가 작다면, 1g 내부의 MPS 스케줄링이 2g 자원에 큰 간섭을 주지 않았다는 MIG 격리 근거로 설명할 수 있다. 이번 측정에서는 MPS on의 2g kernel 평균이 0.400ms, off가 0.446ms였다. 이 차이는 유망하지만 단일 실행 결과이므로 최소 3회 반복 후 평균과 표준편차로 발표해야 한다.
+
+### 발표에서 강조할 것
+
+MPS의 효과를 `MPS가 GPU 자원을 추가했다`고 설명하면 안 된다. 정확한 표현은 다음과 같다.
+
+> MIG가 1g와 2g 사이의 하드웨어 자원 경계를 제공하고, MPS는 그중 1g 인스턴스 내부에서 여러 CUDA process의 kernel 실행을 효율적으로 multiplexing한다. 따라서 이번 실험은 MIG의 인스턴스 격리와 MPS의 process-level scheduling 효과를 분리해 관찰한다.
+
+Nsight GUI에서는 MPS on에서 `mps_1g_a`와 `mps_1g_b`를 각각 열어 kernel 실행 간격과 평균 시간을 비교한다. MPS off에서는 `nomps_1g` timeline에서 두 process의 kernel이 긴 간격과 변동을 보이는지 확인한다. 2g report는 `mps_2g`와 `nomps_2g`의 kernel 평균, 최대값, latency 분포를 비교해 1g MPS가 다른 MIG 인스턴스에 미치는 영향을 설명하는 데 사용한다.
