@@ -19,7 +19,16 @@ echo "$PASSWORD" | sudo -S nvidia-smi -mig 1
 
 echo "=== MIG 설정이 완료되었습니다 ==="
 
-echo "=== 4. MIG 기본 설정 실행 중 ==="
-sudo nvidia-smi mig -cgi 78,83 -C
 echo "=== 드라이버 안정화 대기 중... ==="
 sleep 3
+
+#4. 권장 프로파일 동시 생성 (83번=2g.0gb+gfx, 78번=1g.0gb+me)
+echo "4. 인스턴스 생성 중...(78번 단독생성시 오류 발생)"
+echo "$PASSWORD" | sudo -S nvidia-smi mig -cgi 83, 78 -C
+
+echo "=== MIG 파티셔닝 완료 ==="
+echo "--------------------------------------------------"
+nvidia-smi -L
+echo "--------------------------------------------------"
+echo "위 목록에서 두 개의 MIG UUID(2g, 1g)가 정상적으로 출력되는지 확인하세요."
+

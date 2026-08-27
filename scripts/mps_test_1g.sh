@@ -23,6 +23,10 @@ export CUDA_MPS_LOG_DIRECTORY=/tmp/nvidia-log
 mkdir -p \$CUDA_MPS_PIPE_DIRECTORY \$CUDA_MPS_LOG_DIRECTORY
 nvidia-cuda-mps-control -d
 
+# 👇 [핵심 추가] MPS 서버가 완전히 초기화될 때까지 2초 대기
+echo 'MPS 서버 초기화 대기 중 (2초)...'
+sleep 2
+
 echo '[VLM / 1g] 2개의 프로세스를 MPS 상에서 동시 실행합니다.'
 
 # 워크로드 A (백그라운드 실행, -u 옵션으로 즉시 출력)
