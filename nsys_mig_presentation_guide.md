@@ -352,7 +352,7 @@ Nsight Systems 결과만으로도 실행 시간과 kernel 간섭을 설명할 �
 
 ## 9. MPS on/off 실험
 
-MPS는 MIG와 역할이 다르다. MIG는 GPU 자원을 하드웨어 인스턴스로 분할하고, MPS는 하나의 CUDA context에서 여러 client process의 kernel을 함께 스케줄링하도록 돕는다. 이번 구성에서는 MPS는 1g에만 적용하고 2g는 비교용 workload로 유지한다.
+MPS는 MIG와 역할이 다르다. MIG는 GPU 자원을 하드웨어 인스턴스로 분할하고, MPS는 하나의 1g 인스턴스 안에서 여러 client process의 kernel을 함께 스케줄링하도록 돕는다. 이번 MPS 질문의 핵심은 1g 내부의 process scheduling이므로 2g는 필수 측정 대상이 아니다.
 
 ### 원본 스크립트 평가
 
@@ -372,9 +372,8 @@ MODE=all RUN_SECONDS=20 bash scripts/nsys_mps_compare.sh
 이 명령은 다음 순서로 실행한다.
 
 1. 1g에서 MPS on, 두 client process를 시작한다.
-2. 2초 후 2g latency workload를 시작한다.
-3. MPS on 1g client를 각각 내부 Nsight로 프로파일링한다.
-4. 같은 방식으로 MPS off 조건을 반복한다.
+2. MPS on 1g client를 각각 내부 Nsight로 프로파일링한다.
+3. 같은 workload를 MPS off 조건에서 반복한다.
 
 MPS on에서는 MPS server를 통해 실행되는 client를 바깥 Nsight가 안정적으로 추적하지 못할 수 있다. 그래서 1g의 두 client 각각에 컨테이너 내부 `nsys profile`을 직접 적용한다.
 
@@ -383,9 +382,7 @@ MPS on에서는 MPS server를 통해 실행되는 client를 바깥 Nsight가 안
 ```text
 nsys_mps_results/mps_1g_a.nsys-rep
 nsys_mps_results/mps_1g_b.nsys-rep
-nsys_mps_results/mps_2g.nsys-rep
 nsys_mps_results/nomps_1g.nsys-rep
-nsys_mps_results/nomps_2g.nsys-rep
 ```
 
 ### 이번 20초 결과
@@ -395,12 +392,8 @@ nsys_mps_results/nomps_2g.nsys-rep
 | MPS on, 1g client A | `mps_1g_a.nsys-rep` | 8,353 | 1.117 ms |
 | MPS on, 1g client B | `mps_1g_b.nsys-rep` | 8,383 | 1.110 ms |
 | MPS off, 1g 두 process 합계 | `nomps_1g.nsys-rep` | 11,912 | 3.105 ms |
-| MPS on, 2g | `mps_2g.nsys-rep` | 37,635 | 0.400 ms |
-| MPS off, 2g | `nomps_2g.nsys-rep` | 34,713 | 0.446 ms |
 
 1g에서는 MPS on의 두 client가 각각 약 8.3k kernel을 실행해 합계 약 16.7k회를 기록했다. MPS off는 두 process가 하나의 CUDA 실행 흐름에서 경쟁하면서 합계 11.9k회, 평균 3.105ms로 측정됐다. 이 결과는 MPS가 같은 MIG 인스턴스 안의 여러 process를 더 균등하고 효율적으로 스케줄링할 수 있다는 근거다.
-
-2g에서는 MPS on/off가 모두 1g와 다른 MIG 인스턴스에서 실행된다. 두 조건의 차이가 작다면, 1g 내부의 MPS 스케줄링이 2g 자원에 큰 간섭을 주지 않았다는 MIG 격리 근거로 설명할 수 있다. 이번 측정에서는 MPS on의 2g kernel 평균이 0.400ms, off가 0.446ms였다. 이 차이는 유망하지만 단일 실행 결과이므로 최소 3회 반복 후 평균과 표준편차로 발표해야 한다.
 
 ### 발표에서 강조할 것
 
@@ -408,4 +401,59 @@ MPS의 효과를 `MPS가 GPU 자원을 추가했다`고 설명하면 안 된다.
 
 > MIG가 1g와 2g 사이의 하드웨어 자원 경계를 제공하고, MPS는 그중 1g 인스턴스 내부에서 여러 CUDA process의 kernel 실행을 효율적으로 multiplexing한다. 따라서 이번 실험은 MIG의 인스턴스 격리와 MPS의 process-level scheduling 효과를 분리해 관찰한다.
 
-Nsight GUI에서는 MPS on에서 `mps_1g_a`와 `mps_1g_b`를 각각 열어 kernel 실행 간격과 평균 시간을 비교한다. MPS off에서는 `nomps_1g` timeline에서 두 process의 kernel이 긴 간격과 변동을 보이는지 확인한다. 2g report는 `mps_2g`와 `nomps_2g`의 kernel 평균, 최대값, latency 분포를 비교해 1g MPS가 다른 MIG 인스턴스에 미치는 영향을 설명하는 데 사용한다.
+Nsight GUI에서는 MPS on에서 `mps_1g_a`와 `mps_1g_b`를 각각 열어 kernel 실행 간격과 평균 시간을 비교한다. MPS off에서는 `nomps_1g` timeline에서 두 process의 kernel이 긴 간격과 변동을 보이는지 확인한다.
+
+## 10. 다음에 해볼 만한 검증
+
+### UMA bus bandwidth contention
+
+Thor는 CPU와 GPU가 같은 물리 메모리를 사용하는 UMA 구조이므로, MIG가 GPU SM 자원을 격리해도 CPU memory traffic과 GPU memory traffic은 공통 메모리 경로를 경쟁할 수 있다. 이 주제는 현재 MIG 실험의 가장 흥미로운 확장이다.
+
+권장 실험은 다음 네 조건을 같은 workload와 같은 시간으로 비교하는 것이다.
+
+1. MIG + CPU memory stress 없음
+2. MIG + CPU memory stress 있음
+3. No-MIG + CPU memory stress 없음
+4. No-MIG + CPU memory stress 있음
+
+GPU workload는 현재 matmul을 사용하고, CPU stress는 별도 CPU process가 큰 배열을 반복해서 읽고 쓰도록 만든다. CPU stress는 GPU 인스턴스가 아니라 시스템 UMA bandwidth를 압박한다.
+
+Nsight Systems에서 볼 항목:
+
+- GPU kernel의 `Avg`, `Med`, `Max`, `StdDev`
+- kernel 사이의 빈 구간과 지연 증가
+- CUDA API의 `cudaDeviceSynchronize` 대기 시간
+- CPU thread의 memory loop와 GPU kernel timeline 겹침
+- CPU utilization과 context switch 증가
+
+다만 Nsight Systems만으로 Thor의 실제 DRAM bandwidth를 직접 확정하기는 어렵다. 가능하면 `tegrastats` 또는 Jetson용 HW counter/Nsight Compute 자료를 함께 기록해야 한다. 발표 결론은 “MIG가 GPU execution partition은 유지하지만 UMA memory path의 모든 contention을 제거하지는 않는다”처럼 제한해서 표현한다.
+
+### CPU launch starvation
+
+GPU kernel은 CPU가 launch하고 synchronize하므로, CPU가 중요한 workload에 점유되거나 scheduling delay를 겪으면 GPU가 idle해질 수 있다. 이 현상은 특히 짧은 kernel을 빠르게 반복하는 workload에서 잘 드러난다.
+
+권장 비교 조건:
+
+- CPU affinity를 1g workload와 겹치게 설정
+- CPU affinity를 분리해 설정
+- CPU stress 없음/있음
+- MIG와 No-MIG 각각 반복
+
+Nsight Systems에서 확인할 항목:
+
+- CUDA API의 `cuLaunchKernelEx` 호출 시각과 GPU kernel 시작 시각 사이 간격
+- GPU timeline의 빈 구간
+- CPU thread state에서 `Running`, `Runnable`, `Blocked` 구간
+- OS runtime, context switch, scheduler latency report
+- NVTX range의 시작 시각과 첫 GPU kernel 시각 사이 지연
+
+해석 기준은 다음과 같다. GPU row가 비어 있는데 CPU thread가 `Runnable` 또는 다른 process에 밀려 있다면 CPU launch starvation 가능성이 있다. 반대로 CPU가 실행 중인데 GPU kernel이 계속 차 있다면 CPU가 병목이라고 단정할 수 없다. 이 경우 GPU execution 또는 UMA bandwidth가 원인일 수 있으므로 kernel latency와 memory counter를 함께 봐야 한다.
+
+### 실험 시 주의점
+
+- CPU stress process의 CPU affinity를 명시해 MIG 인스턴스의 workload CPU와 겹침/분리를 통제한다.
+- CPU stress의 배열이 LLC에만 머물지 않도록 충분히 크게 잡는다.
+- CPU와 GPU workload의 warm-up을 측정 구간에서 제외한다.
+- 같은 `RUN_SECONDS`, matrix 크기, kernel 수집 옵션을 사용한다.
+- 한 조건을 최소 3회 반복하고 평균, 중앙값, 표준편차를 기록한다.
+- MPS, MIG, CPU stress, UMA traffic을 한 번에 모두 바꾸지 말고 한 요인씩 비교한다.
