@@ -407,7 +407,12 @@ Nsight GUI에서는 MPS on에서 `mps_1g_a`와 `mps_1g_b`를 각각 열어 kerne
 
 ### UMA bus bandwidth contention
 
-Thor는 CPU와 GPU가 같은 물리 메모리를 사용하는 UMA 구조이므로, MIG가 GPU SM 자원을 격리해도 CPU memory traffic과 GPU memory traffic은 공통 메모리 경로를 경쟁할 수 있다. 이 주제는 현재 MIG 실험의 가장 흥미로운 확장이다.
+Thor는 CPU와 GPU가 같은 물리 메모리 시스템을 사용하는 UMA 구조이므로, MIG가 GPU 내부의 compute 인스턴스를 분리해도 CPU/GPU 요청이 공통 SoC memory controller와 DRAM 경로에서 경쟁할 가능성이 있다. 다만 이것을 “칩셋 레벨 bus contention”이라고 단정하기보다, 현재 공개 자료로는 “공유 UMA memory path contention”이라고 표현하는 것이 정확하다. Thor의 구체적인 interconnect arbitration과 MIG별 memory QoS 보장 여부는 공개 자료만으로 확정할 수 없으며, counter 실험으로 확인해야 한다.
+
+하드웨어 관점에서는 두 층을 구분한다.
+
+- GPU 내부 층: MIG가 각 인스턴스에 compute/GPU 자원을 배정하고 인스턴스 간 실행 간섭을 줄인다.
+- SoC 메모리 층: CPU, GPU, 그리고 다른 SoC 블록의 요청이 공통 memory controller/DRAM 경로를 사용할 수 있다. 이 층의 경합은 MIG가 자동으로 모두 제거한다고 가정하면 안 된다.
 
 권장 실험은 다음 네 조건을 같은 workload와 같은 시간으로 비교하는 것이다.
 
@@ -426,7 +431,25 @@ Nsight Systems에서 볼 항목:
 - CPU thread의 memory loop와 GPU kernel timeline 겹침
 - CPU utilization과 context switch 증가
 
-다만 Nsight Systems만으로 Thor의 실제 DRAM bandwidth를 직접 확정하기는 어렵다. 가능하면 `tegrastats` 또는 Jetson용 HW counter/Nsight Compute 자료를 함께 기록해야 한다. 발표 결론은 “MIG가 GPU execution partition은 유지하지만 UMA memory path의 모든 contention을 제거하지는 않는다”처럼 제한해서 표현한다.
+Nsight Systems의 Thor SoC Metrics는 이 실험에 직접 사용할 수 있다. 현재 장치에서 확인된 metric set은 `t264`이며, 다음 계열을 수집 대상으로 삼는다.
+
+- CPU read/write throughput
+- GPU read/write throughput
+- 전체 DRAM read/write throughput
+- DBB read/write throughput
+
+예시 명령은 다음과 같다. 실제 workload 명령은 마지막에 붙인다.
+
+```bash
+sudo nsys profile --soc-metrics=true --soc-metrics-set=t264 \
+  --soc-metrics-frequency=1000 --trace=cuda,osrt,nvtx \
+  --sample=none --cpuctxsw=process-tree -d 20 -o uma_mig_cpu_stress \
+  <workload>
+```
+
+`tegrastats --interval 100`도 동시에 별도 로그로 남긴다. Nsight Systems는 timestamp로 GPU kernel과 SoC counter를 맞춰 볼 수 있고, `tegrastats`는 전력/온도/메모리 압박 등 시스템 상태를 보조한다. 발표 결론은 “MIG가 GPU execution partition은 유지하지만 공유 UMA memory path의 모든 contention을 제거하지는 않는다”처럼 제한한다.
+
+가장 중요한 판정은 다음과 같다. CPU memory stress를 추가했을 때 CPU/GPU throughput counter가 함께 올라가고 GPU kernel 평균/최대 시간이 증가하면 UMA contention의 근거다. GPU kernel 시간이 증가하지 않고 CPU counter만 올라가면 해당 workload에서는 UMA 경합이 지배적이지 않다고 판단한다.
 
 ### CPU launch starvation
 
@@ -439,6 +462,8 @@ GPU kernel은 CPU가 launch하고 synchronize하므로, CPU가 중요한 workloa
 - CPU stress 없음/있음
 - MIG와 No-MIG 각각 반복
 
+이 실험은 GPU workload를 짧은 kernel 반복으로 구성해야 한다. 큰 matmul 하나만 반복하면 GPU가 실행 중인 시간이 길어 CPU launch gap이 가려질 수 있다.
+
 Nsight Systems에서 확인할 항목:
 
 - CUDA API의 `cuLaunchKernelEx` 호출 시각과 GPU kernel 시작 시각 사이 간격
@@ -447,7 +472,67 @@ Nsight Systems에서 확인할 항목:
 - OS runtime, context switch, scheduler latency report
 - NVTX range의 시작 시각과 첫 GPU kernel 시각 사이 지연
 
-해석 기준은 다음과 같다. GPU row가 비어 있는데 CPU thread가 `Runnable` 또는 다른 process에 밀려 있다면 CPU launch starvation 가능성이 있다. 반대로 CPU가 실행 중인데 GPU kernel이 계속 차 있다면 CPU가 병목이라고 단정할 수 없다. 이 경우 GPU execution 또는 UMA bandwidth가 원인일 수 있으므로 kernel latency와 memory counter를 함께 봐야 한다.
+해석 기준은 다음과 같다. GPU row가 비어 있는데 다음 `cuLaunchKernelEx`가 늦게 호출되거나 CPU thread가 `Runnable`/다른 process에 밀려 있다면 CPU launch starvation 가능성이 있다. 반대로 CPU가 실행 중인데 GPU kernel이 계속 차 있다면 CPU가 병목이라고 단정할 수 없다. 이 경우 GPU execution 또는 UMA bandwidth가 원인일 수 있으므로 kernel latency와 SoC memory counter를 함께 봐야 한다.
+
+현재 환경에서는 `nsys status --environment` 결과상 process-tree CPU profiling은 가능하지만 system-wide CPU profiling은 실패한다. 또한 CPU hardware metric은 `perf_event_paranoid=2` 때문에 root가 필요하다. 따라서 1차 실험은 workload container 안의 `--cpuctxsw=process-tree`로 수행하고, 시스템 전체 scheduler와 CPU PMU counter가 필요할 때만 `sudo`를 사용한다.
+
+## 11. 권장 최종 실험 매트릭스
+
+연구 목적에 가장 직접적인 순서는 다음과 같다.
+
+| 단계 | 변경 요인 | 고정 요인 | 핵심 측정 |
+|---|---|---|---|
+| A | MIG 1g 단독/2g 단독/1g+2g 동시 | workload, CPU affinity | kernel latency, instances/s |
+| B | No-MIG 단독/두 process 동시 | workload, CPU affinity | serialization, tail latency |
+| C | 1g MPS off/on | MIG layout, workload | process fairness, throughput |
+| D | CPU memory stress off/on | MIG layout, GPU workload | CPU/GPU/DRAM throughput, kernel slowdown |
+| E | CPU affinity 분리/충돌 | MIG layout, memory stress | launch gap, GPU idle gap, context switch |
+
+각 조건은 최소 3회 반복한다. D와 E가 “MIG의 효과가 어디까지인가”를 보여주는 핵심 확장이다. A-C는 자원 배분과 MPS scheduling을 설명하고, D는 UMA 공유 경로, E는 CPU 제어 경로를 검증한다.
+
+## 12. 도구별 역할
+
+- **Nsight Systems**: CUDA API, GPU kernel timeline, CPU thread state, context switch, NVTX, Thor SoC Metrics를 하나의 시간축에서 상관 분석한다.
+- **Nsight Compute**: 대표 kernel의 occupancy, memory throughput, tensor pipe 등 kernel 내부 원인을 분석한다. Systems에서 병목 kernel을 고른 뒤 사용한다.
+- **tegrastats**: Jetson 전체의 보조 상태 로그를 기록한다. CPU/GPU load, memory, EMC, temperature, power를 workload 시간과 맞춘다.
+- **nvidia-smi**: MIG 인스턴스 UUID, 프로파일, 현재 process와 설정 상태를 기록한다. 대역폭 counter 도구로 사용하지 않는다.
+- **perf**: CPU scheduler/PMU를 별도 검증할 때 사용한다. container 권한과 `perf_event_paranoid` 영향을 받으므로 Nsight CPU 결과와 교차 확인한다.
+
+발표에서는 Nsight Systems screenshot을 주 증거로 사용하고, SoC Metrics와 `tegrastats`를 UMA 경합의 정량 보조 증거로 제시한다. Nsight Compute는 “왜 이 kernel이 느려졌는가”를 설명하는 후속 자료로 사용한다.
+
+## 13. UMA 측정 결과
+
+`scripts/nsys_uma_compare.sh`로 MIG 1g workload를 20초 동안 측정했다. `nostress`는 CPU memory stress가 없고, `stress`는 4개의 NumPy process가 각각 256 MiB 배열을 반복해서 읽고 쓰는 조건이다. 두 조건 모두 같은 MIG 1g UUID, 같은 CPU affinity, 같은 PyTorch matmul을 사용했다.
+
+### 최종 결과
+
+| 지표 | CPU stress 없음 | CPU stress 있음 | 변화 |
+|---|---:|---:|---:|
+| GPU matmul iterations | 22,418 | 21,030 | -6.2% |
+| 평균 GPU kernel 시간 | 0.849 ms | 0.897 ms | +5.7% |
+| CPU Read Throughput | 0.76% | 19.34% | 증가 |
+| GPU Read Throughput | 33.48% | 30.16% | 감소 |
+| DRAM Read Throughput | 33.62% | 49.43% | 증가 |
+| DRAM Write Throughput | 6.04% | 24.83% | 증가 |
+
+보고서와 보조 로그:
+
+```text
+nsys_uma_results/nostress_soc.nsys-rep
+nsys_uma_results/stress_soc.nsys-rep
+nsys_uma_results/nostress_tegrastats.log
+nsys_uma_results/stress_tegrastats.log
+nsys_uma_results/nostress_workload.txt
+nsys_uma_results/stress_workload.txt
+```
+
+### 해석
+
+CPU stress 조건에서 CPU read와 DRAM read/write throughput이 크게 증가했고 GPU read throughput은 감소했다. 같은 시점에 GPU matmul 평균 시간이 0.849 ms에서 0.897 ms로 증가하고 반복 처리량이 6.2% 감소했다. 이 결과는 MIG 1g의 GPU compute partition이 존재해도 Thor의 공유 UMA memory path에서 CPU와 GPU traffic이 경합할 수 있다는 실험적 근거다.
+
+이번 결과만으로 CPU traffic이 항상 가장 치명적인 병목이라고 결론 내리면 안 된다. slowdown은 약 6%로 측정됐으므로 이 workload에서는 경합이 존재하지만 지배적인 병목은 아닐 수 있다. memory-bound kernel, 더 많은 CPU stress worker, 다른 CPU affinity, 또는 더 작은 GPU kernel을 추가해 민감도를 확인해야 한다.
+
+또한 이 실험의 SoC report는 `--trace=none`으로 수집한 system-level metric report다. GPU kernel의 정확한 API/kernel 통계는 별도 CUDA Nsight report에서 확인하고, 이 report에서는 SoC throughput과 `tegrastats`를 시간축으로 맞춰 해석한다. 따라서 발표에서는 “SoC counter와 workload timing이 함께 변했다”고 표현하고, counter 하나만으로 인과관계를 단정하지 않는다.
 
 ### 실험 시 주의점
 
