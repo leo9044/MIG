@@ -19,8 +19,6 @@ run_profile() {
     local profile_status=0
     sudo docker run --rm --runtime nvidia --pid=host --ipc=host \
         -v "${RESULT_DIR}:/results" \
-        -e NVIDIA_VISIBLE_DEVICES=all \
-        -e CUDA_VISIBLE_DEVICES="$cuda_visible" \
         "$@" \
         "$IMAGE" \
         nsys profile \
@@ -97,10 +95,12 @@ start_nomig_capture() {
         exit 1
     }
 
-    run_profile nomig_workload_a 0 &
+    run_profile nomig_workload_a 0 \
+        --device /dev/nvidia0 --device /dev/nvidiactl --device /dev/nvidia-uvm &
     local pid_a=$!
     sleep 2
-    run_profile nomig_workload_b 0 &
+    run_profile nomig_workload_b 0 \
+        --device /dev/nvidia0 --device /dev/nvidiactl --device /dev/nvidia-uvm &
     local pid_b=$!
     wait "$pid_a" "$pid_b"
 }

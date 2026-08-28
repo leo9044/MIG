@@ -13,6 +13,21 @@ Nsight Systems는 CUDA API 호출과 GPU kernel 실행을 시간축으로 보여
 
 Nsight Systems만으로 모든 하드웨어 자원 사용률을 증명할 수 있는 것은 아니다. MIG 인스턴스의 실제 SM 수, 메모리 용량, 프로파일별 정적 자원 정보는 `nvidia-smi`와 MIG 프로파일 문서를 함께 사용해야 한다. Nsight Systems는 주로 시간적 실행 행태와 간섭 여부를 보여주는 자료다.
 
+### 실험 환경 기준
+
+핵심 MIG/MPS 재실험은 다음 환경에서 수행했다.
+
+```text
+Jetson AGX Thor
+Ubuntu 24.04 / L4T 39.2.1
+NVIDIA driver 595.78
+Docker Engine 29.7.2
+NVIDIA Container Toolkit 1.19.1
+PyTorch container nvcr.io/nvidia/pytorch:25.08-py3
+```
+
+JetPack 전체 meta-package는 설치하지 않았지만 L4T CUDA와 driver는 설치되어 있고, PyTorch/CUDA runtime은 컨테이너 내부에서 사용했다.
+
 ## 2. 실행 순서
 
 ### MIG 설정
@@ -56,19 +71,7 @@ nsys_results/mig_2g.nsys-rep
 
 ### 비-MIG baseline 측정
 
-비-MIG 비교가 필요할 때만 다음을 실행한다. 이 명령은 MIG 인스턴스를 삭제하고 MIG 모드를 끈다.
-
-```bash
-cd /home/leo/MIG
-MODE=nomig RUN_SECONDS=20 bash scripts/nsys_mig_compare.sh
-```
-
-생성 파일:
-
-```text
-nsys_results/nomig_workload_a.nsys-rep
-nsys_results/nomig_workload_b.nsys-rep
-```
+비-MIG 비교는 별도 조건 실험이다. 현재 발표용 결과 디렉터리에는 최신 Toolkit/raw-device 조건과 직접 비교할 수 없는 이전 No-MIG report를 포함하지 않았다. 발표에 No-MIG를 넣으려면 MIG를 해제한 뒤 동일한 Toolkit, device 전달 방식, workload, 실행 시간으로 새로 수집한다.
 
 현재 시스템을 다시 MIG로 사용할 경우, MIG 모드 변경 뒤 GPU reset 또는 재부팅이 필요할 수 있다. Thor에서 비-MIG 전환 후 `GPU requires reset` 상태가 발생했고, `nvidia-smi -r`는 지원되지 않았다.
 
@@ -88,7 +91,7 @@ nsys_results/nomig_workload_b.nsys-rep
 - 두 workload 중 하나가 다른 workload 때문에 긴 빈 구간이나 대기 구간을 보이는가?
 - GPU context 또는 CUDA stream이 반복적으로 전환되는가?
 
-MIG 결과에서 1g와 2g가 같은 시간대에 계속 실행되면, 두 인스턴스가 병렬로 동작했다는 시각적 근거가 된다. 하나의 `.nsys-rep`는 하나의 workload만 담고 있으므로, 두 파일을 각각 열어 같은 시간축 기준으로 비교하거나 GUI의 timeline export/screenshot을 사용한다.
+MIG 결과에서 각 report의 GPU kernel이 측정 구간에 지속적으로 나타나고, 실행기가 1g를 먼저 시작한 뒤 2g를 2초 후 시작했다는 로그가 있으면 병렬 실행을 뒷받침하는 자료가 된다. 두 인스턴스는 별도 `.nsys-rep`로 수집되므로 GUI multi-report view로 정렬할 수 있지만, 시각적 정렬만으로 동시성을 단정하지 말고 실행 로그와 workload 결과를 함께 제시한다.
 
 ### 3.2 CUDA API row
 
@@ -140,16 +143,6 @@ nsys stats --report cuda_api_sum,cuda_gpu_kern_sum \
   --force-export=true nsys_results/mig_2g.nsys-rep
 ```
 
-baseline도 같은 방식으로 확인한다.
-
-```bash
-nsys stats --report cuda_api_sum,cuda_gpu_kern_sum \
-  --force-export=true nsys_results/nomig_workload_a.nsys-rep
-
-nsys stats --report cuda_api_sum,cuda_gpu_kern_sum \
-  --force-export=true nsys_results/nomig_workload_b.nsys-rep
-```
-
 보고서에 다음 문구가 나오면 유효하지 않은 파일이다.
 
 ```text
@@ -157,16 +150,14 @@ SKIPPED: ... does not contain CUDA trace data.
 SKIPPED: ... does not contain CUDA kernel data.
 ```
 
-현재 확보된 결과의 대표 수치는 다음과 같다.
+최신 발표용 MIG 결과는 Toolkit 1.19.1과 raw `--device` 방식으로 20초 수집했다.
 
-| 조건 | 파일 | 대표 kernel instances | 대표 kernel total time |
-|---|---|---:|---:|
-| MIG 1g | `mig_1g.nsys-rep` | 1,947 | 1.746 s |
-| MIG 2g | `mig_2g.nsys-rep` | 4,292 | 1.660 s |
-| No MIG A | `nomig_workload_a.nsys-rep` | 30,618 | 18.207 s |
-| No MIG B | `nomig_workload_b.nsys-rep` | 29,297 | 18.311 s |
+| 조건 | 대표 kernel instances | 대표 kernel total time | 평균 kernel 시간 |
+|---|---:|---:|---:|
+| MIG 1g | 12,675 | 18.744 s | 1.479 ms |
+| MIG 2g | 37,176 | 18.624 s | 0.501 ms |
 
-주의: MIG 자료는 당시 3초 수집, baseline은 20초 수집이었다. 따라서 위의 총합 시간만 직접 비교하면 안 된다. 발표 자료를 새로 만들 때는 반드시 같은 `RUN_SECONDS`로 다시 수집하고, 다음 값도 계산한다.
+이전에 수집한 No-MIG report는 Toolkit 1.20.0과 MIG UUID 환경 변수 사용 조건의 자료이므로 최신 MIG 결과와 직접 비교하지 않는다. No-MIG 비교를 발표에 포함하려면 Toolkit 1.19.1/raw `--device` 조건에서 동일한 `RUN_SECONDS`로 다시 수집해야 한다.
 
 ```text
 kernel_instances_per_second = Instances / RUN_SECONDS
@@ -358,7 +349,7 @@ MPS는 MIG와 역할이 다르다. MIG는 GPU 자원을 하드웨어 인스턴�
 
 `scripts/mps_test_1g.sh`는 1g MIG UUID를 찾고, MPS pipe/log 디렉터리를 만든 뒤 `nvidia-cuda-mps-control -d`를 실행하고 두 Python process를 동시에 시작한다. 따라서 MPS를 적용한다는 핵심 구조는 맞다. 하지만 `while True`와 `wait` 때문에 자동 종료되지 않고, process별 실행량과 latency를 기록하지 않으며, 실행 후 MPS daemon 정리가 없다.
 
-`scripts/mps_test_2g.sh`는 2g에서 CUDA event로 100회 matmul latency를 측정한다. 1g workload가 이미 실행 중이라는 전제에서는 유용하지만, 수동 실행 순서에 의존하고 측정 시간이 짧으며 반복 통계가 없다. 원본은 보존하고, 고정 시간 Nsight 측정은 `scripts/nsys_mps_compare.sh`가 담당한다.
+`scripts/mps_test_2g.sh`는 2g에서 CUDA event로 100회 matmul latency를 측정한다. 1g workload가 이미 실행 중이라는 전제에서는 유용하지만, 수동 실행 순서에 의존하고 측정 시간이 짧으며 반복 통계가 없다. 원본은 보존하고, 고정 시간 Nsight 측정은 `scripts/nsys_mps_compare.sh`가 담당한다. MPS의 핵심 질문은 1g 내부 process scheduling이므로 최종 MPS 자료에서는 2g report를 사용하지 않았다.
 
 ### MPS 측정 실행
 
@@ -389,11 +380,11 @@ nsys_mps_results/nomps_1g.nsys-rep
 
 | 조건 | report | 대표 kernel instances | 평균 kernel 시간 |
 |---|---|---:|---:|
-| MPS on, 1g client A | `mps_1g_a.nsys-rep` | 8,353 | 1.117 ms |
-| MPS on, 1g client B | `mps_1g_b.nsys-rep` | 8,383 | 1.110 ms |
-| MPS off, 1g 두 process 합계 | `nomps_1g.nsys-rep` | 11,912 | 3.105 ms |
+| MPS on, 1g client A | `mps_1g_a.nsys-rep` | 10,913 | 0.860 ms |
+| MPS on, 1g client B | `mps_1g_b.nsys-rep` | 10,928 | 0.859 ms |
+| MPS off, 1g 두 process 합계 | `nomps_1g.nsys-rep` | 18,151 | 2.045 ms |
 
-1g에서는 MPS on의 두 client가 각각 약 8.3k kernel을 실행해 합계 약 16.7k회를 기록했다. MPS off는 두 process가 하나의 CUDA 실행 흐름에서 경쟁하면서 합계 11.9k회, 평균 3.105ms로 측정됐다. 이 결과는 MPS가 같은 MIG 인스턴스 안의 여러 process를 더 균등하고 효율적으로 스케줄링할 수 있다는 근거다.
+1g에서는 최신 20초 MPS on 측정에서 두 client가 각각 10,913회와 10,928회의 대표 kernel을 실행했고 평균 kernel 시간은 각각 0.860 ms와 0.859 ms였다. MPS off report는 두 process를 하나의 report로 집계해 18,151회의 kernel과 2.045 ms 평균을 보였다. 이 aggregate 값은 MPS on의 개별 client 평균과 직접 비교하면 안 된다. 현재 결과는 MPS on에서 두 client가 균등하게 실행된다는 근거로 사용하고, 총 처리량 우위 주장은 동일한 process별 측정과 반복 실험 후에만 한다.
 
 ### 발표에서 강조할 것
 
@@ -530,7 +521,7 @@ nsys_uma_results/stress_workload.txt
 
 CPU stress 조건에서 CPU read와 DRAM read/write throughput이 크게 증가했고 GPU read throughput은 감소했다. 같은 시점에 GPU matmul 평균 시간이 0.849 ms에서 0.897 ms로 증가하고 반복 처리량이 6.2% 감소했다. 이 결과는 MIG 1g의 GPU compute partition이 존재해도 Thor의 공유 UMA memory path에서 CPU와 GPU traffic이 경합할 수 있다는 실험적 근거다.
 
-이번 결과만으로 CPU traffic이 항상 가장 치명적인 병목이라고 결론 내리면 안 된다. slowdown은 약 6%로 측정됐으므로 이 workload에서는 경합이 존재하지만 지배적인 병목은 아닐 수 있다. memory-bound kernel, 더 많은 CPU stress worker, 다른 CPU affinity, 또는 더 작은 GPU kernel을 추가해 민감도를 확인해야 한다.
+이번 결과만으로 CPU traffic이 항상 가장 치명적인 병목이라고 결론 내리면 안 된다. 깨끗한 20초 재측정에서 slowdown은 약 5.7%로 측정됐으므로 이 workload에서는 경합이 존재하지만 지배적인 병목은 아닐 수 있다. memory-bound kernel, 더 많은 CPU stress worker, 다른 CPU affinity, 또는 더 작은 GPU kernel을 추가해 민감도를 확인해야 한다.
 
 또한 이 실험의 SoC report는 `--trace=none`으로 수집한 system-level metric report다. GPU kernel의 정확한 API/kernel 통계는 별도 CUDA Nsight report에서 확인하고, 이 report에서는 SoC throughput과 `tegrastats`를 시간축으로 맞춰 해석한다. 따라서 발표에서는 “SoC counter와 workload timing이 함께 변했다”고 표현하고, counter 하나만으로 인과관계를 단정하지 않는다.
 

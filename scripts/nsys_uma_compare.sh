@@ -37,8 +37,6 @@ run_condition() {
         docker run --rm --runtime nvidia --pid=host --ipc=host \
             -v "${RESULT_DIR}:/results" \
             --cpuset-cpus=2-11 \
-            -e NVIDIA_VISIBLE_DEVICES=all \
-            -e CUDA_VISIBLE_DEVICES="$uuid_1g" \
             -e RUN_SECONDS="$RUN_SECONDS" \
             -e CPU_STRESS="$stress" \
             -e RESULT_FILE="/results/${condition}_workload.txt" \

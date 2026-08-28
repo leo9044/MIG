@@ -23,7 +23,6 @@ profile_1g() {
     local profile_status=0
     local docker_args=(run --rm --runtime nvidia --pid=host --ipc=host
         -v "${RESULT_DIR}:/results"
-        -e NVIDIA_VISIBLE_DEVICES=all -e CUDA_VISIBLE_DEVICES="$uuid"
         -e RUN_SECONDS="$RUN_SECONDS"
         --device /dev/nvidia-caps/nvidia-cap21 --device /dev/nvidia-caps/nvidia-cap22
         --device /dev/nvidia0 --device /dev/nvidiactl --device /dev/nvidia-uvm

@@ -1,0 +1,8 @@
+experiment,condition,workload,measurement_seconds,instances,total_gpu_time_ms,avg_kernel_ms,throughput_instances_per_s,cpu_read_pct,gpu_read_pct,dram_read_pct,dram_write_pct,notes
+MIG,mig_1g,GEMM,20,12675,18744.011712,1.4788175,633.75,,,,,"Latest Toolkit 1.19.1 and raw device nodes"
+MIG,mig_2g,GEMM,20,37176,18623.573312,0.5009569,1858.80,,,,,"Latest Toolkit 1.19.1 and raw device nodes"
+MPS,mps_on_client_A,GEMM,20,10913,9388.244896,0.8602808,545.65,,,,,"1g MPS client A; one run"
+MPS,mps_on_client_B,GEMM,20,10928,9383.785024,0.8586919,546.40,,,,,"1g MPS client B; one run"
+MPS,mps_off_two_processes,GEMM,20,18151,37119.496576,2.0450387,907.55,,,,,"1g aggregate report; one run"
+UMA,nostress,GEMM,20,21492,19120.860,0.890000,1074.60,0.76,33.48,33.62,6.04,"1g MIG; four CPU stress workers absent"
+UMA,stress,GEMM,20,13039,19502.733,1.496000,651.95,19.34,19.15,49.43,24.83,"1g MIG; four NumPy memory stress workers"
