@@ -1,0 +1,98 @@
+[
+  {
+    "workers": 4,
+    "mode": "off",
+    "run": "workers4_off_rep1",
+    "throughput_ops_s": 41712.34765998381,
+    "mean_batch_ms": 1.098684764712933,
+    "p95_batch_ms": 1.101792
+  },
+  {
+    "workers": 4,
+    "mode": "off",
+    "run": "workers4_off_rep2",
+    "throughput_ops_s": 41762.934810454935,
+    "mean_batch_ms": 1.0988872726402106,
+    "p95_batch_ms": 1.101792
+  },
+  {
+    "workers": 4,
+    "mode": "off",
+    "run": "workers4_off_rep3",
+    "throughput_ops_s": 41765.19261564258,
+    "mean_batch_ms": 1.098266596755851,
+    "p95_batch_ms": 1.101376
+  },
+  {
+    "workers": 4,
+    "mode": "on",
+    "run": "workers4_on_rep1",
+    "throughput_ops_s": 25508.31857811782,
+    "mean_batch_ms": 7.6353617624461,
+    "p95_batch_ms": 7.9115104
+  },
+  {
+    "workers": 4,
+    "mode": "on",
+    "run": "workers4_on_rep2",
+    "throughput_ops_s": 25752.446607685608,
+    "mean_batch_ms": 7.574403152785867,
+    "p95_batch_ms": 7.8528304
+  },
+  {
+    "workers": 4,
+    "mode": "on",
+    "run": "workers4_on_rep3",
+    "throughput_ops_s": 25435.849246136346,
+    "mean_batch_ms": 7.682382504570025,
+    "p95_batch_ms": 7.945408
+  },
+  {
+    "workers": 8,
+    "mode": "off",
+    "run": "workers8_off_rep1",
+    "throughput_ops_s": 41759.841759771734,
+    "mean_batch_ms": 1.099216634867437,
+    "p95_batch_ms": 1.101376
+  },
+  {
+    "workers": 8,
+    "mode": "off",
+    "run": "workers8_off_rep2",
+    "throughput_ops_s": 41743.26582629767,
+    "mean_batch_ms": 1.098543335169441,
+    "p95_batch_ms": 1.101472
+  },
+  {
+    "workers": 8,
+    "mode": "off",
+    "run": "workers8_off_rep3",
+    "throughput_ops_s": 41726.50877920588,
+    "mean_batch_ms": 1.0996507698574338,
+    "p95_batch_ms": 1.102528
+  },
+  {
+    "workers": 8,
+    "mode": "on",
+    "run": "workers8_on_rep1",
+    "throughput_ops_s": 25623.160557916046,
+    "mean_batch_ms": 15.36722470159009,
+    "p95_batch_ms": 15.55024
+  },
+  {
+    "workers": 8,
+    "mode": "on",
+    "run": "workers8_on_rep2",
+    "throughput_ops_s": 25137.531004916615,
+    "mean_batch_ms": 15.651509819148934,
+    "p95_batch_ms": 15.8321424
+  },
+  {
+    "workers": 8,
+    "mode": "on",
+    "run": "workers8_on_rep3",
+    "throughput_ops_s": 25152.838911601433,
+    "mean_batch_ms": 15.648449399224804,
+    "p95_batch_ms": 15.8292784
+  }
+]

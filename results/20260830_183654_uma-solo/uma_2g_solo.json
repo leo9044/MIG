@@ -1,0 +1,13 @@
+{
+  "label": "uma_2g_solo",
+  "started_unix_s": 1788082616.4911637,
+  "duration_s": 30.0,
+  "matrix_size": 2000,
+  "cuda_device": "NVIDIA Thor MIG 2g.0gb",
+  "cuda_visible_devices": "MIG-5fed0c49-2b3a-5a18-9775-b9e09f43abc3",
+  "pid": 1,
+  "result": "completed",
+  "iterations": 70501,
+  "ended_unix_s": 1788082646.7264688,
+  "mean_cuda_ms": 0.37040798626969834
+}

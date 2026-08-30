@@ -1,0 +1,3 @@
+GPU 0: NVIDIA Thor (UUID: GPU-a7c66ad2-6dbb-0ab8-c1a2-37ba6dba3600)
+  MIG 2g.0gb      Device  0: (UUID: MIG-5fed0c49-2b3a-5a18-9775-b9e09f43abc3)
+  MIG 1g.0gb      Device  1: (UUID: MIG-dc9740e4-9b05-5ffd-80ed-06e319c83fab)

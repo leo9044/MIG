@@ -1,0 +1,13 @@
+{
+  "label": "nomig_a",
+  "started_unix_s": 1788082543.644136,
+  "duration_s": 46.0,
+  "matrix_size": 2000,
+  "cuda_device": "NVIDIA Thor",
+  "cuda_visible_devices": "0",
+  "pid": 1,
+  "result": "completed",
+  "iterations": 60990,
+  "ended_unix_s": 1788082590.1590207,
+  "mean_cuda_ms": 0.2696058747991474
+}

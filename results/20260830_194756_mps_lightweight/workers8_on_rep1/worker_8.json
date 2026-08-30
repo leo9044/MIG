@@ -1,0 +1,10 @@
+{
+  "label": "worker_8",
+  "result": "completed",
+  "batches": 1271,
+  "operations": 63550,
+  "matrix_size": 512,
+  "batch_size": 50,
+  "mean_cuda_batch_ms": 15.410996519276159,
+  "pid": 173
+}

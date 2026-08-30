@@ -88,3 +88,34 @@
 - 이후 확장: 3-2
 
 **현재 기준으로 가장 현실적인 실험 범위는 위와 같다.**
+
+---
+
+## 3-1 추가 실험 — 다수의 경량 CUDA 작업에서 MPS 유효성 재검증
+
+### 추가하는 이유
+
+기존 3-1은 2000×2000 matmul을 수행하는 무거운 프로세스 2개를 비교했다. 이 workload는 1g slice를 이미 포화시킬 수 있어 MPS가 겹쳐 실행할 여유가 없는 조건일 수 있다. MPS의 목적에 더 맞는 조건은 여러 개의 짧은 CUDA 작업이 동시에 제출되는 경우다.
+
+### 목적과 가설
+
+**목적:** 같은 1g MIG slice에서 다수의 경량 CUDA worker가 작업을 제출할 때 MPS가 aggregate throughput 또는 kernel overlap을 높이는지 확인한다.
+
+- H1: 작은 matmul을 여러 worker가 연속 제출하면 MPS on에서 aggregate throughput이 증가할 수 있다.
+- H2: 차이가 없거나 MPS on이 낮으면 workload 포화, MPS 관리 비용, 공유 자원 경합이 이득보다 크다.
+- H3: Nsight Systems timeline에 kernel overlap이 없으면 MPS 설정/동작 검증이 먼저 필요하다.
+
+### 실험 설계
+
+1. 동일한 1g MIG UUID에서 512×512 FP32 matmul worker를 4개, 8개 실행한다.
+2. 각 worker는 50개 matmul을 연속 enqueue한 뒤 한 번 synchronize한다. batch 반복으로 짧은 커널의 동시 제출 기회를 만든다.
+3. worker 수별로 MPS off/on을 각각 3회 실행하고 순서는 off → on → on → off → off → on으로 교차한다.
+4. 매 batch의 CUDA-event 시간, wall time, 완료 operation 수를 CSV에 저장한다. aggregate throughput은 모든 worker throughput의 합이다.
+5. 매 run에 tegrastats(100 ms)를 수집한다.
+6. 정량 측정과 별도로 4-worker MPS on/off에서 Nsight Systems CUDA/NVTX trace를 짧게 캡처해 kernel overlap을 확인한다. profiler trace는 성능 수치 계산에 사용하지 않는다.
+
+### 판정 기준과 한계
+
+- 3회 반복 중앙값 aggregate throughput, p95 batch latency, worker 간 편차를 비교한다.
+- MPS on 수치가 높고 timeline overlap도 확인되면 경량 다중 프로세스 조건의 MPS 효용을 뒷받침한다.
+- 한 번의 실험이나 API timing만으로 일반 성능 우위를 주장하지 않는다.

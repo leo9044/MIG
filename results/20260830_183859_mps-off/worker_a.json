@@ -1,0 +1,13 @@
+{
+  "label": "worker_a",
+  "started_unix_s": 1788082741.546795,
+  "duration_s": 30.0,
+  "matrix_size": 2000,
+  "cuda_device": "NVIDIA Thor MIG 1g.0gb",
+  "cuda_visible_devices": "MIG-dc9740e4-9b05-5ffd-80ed-06e319c83fab",
+  "pid": 159,
+  "result": "completed",
+  "iterations": 15731,
+  "ended_unix_s": 1788082771.8024304,
+  "mean_cuda_ms": 0.853568492276397
+}
