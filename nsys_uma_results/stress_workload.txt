@@ -1,1 +1,0 @@
-iterations=21030 total_gpu_ms=18866.975 avg_gpu_ms=0.897
