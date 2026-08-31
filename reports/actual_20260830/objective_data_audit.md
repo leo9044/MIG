@@ -9,7 +9,7 @@
 
 ## 요약
 
-| 항목 | 원시 데이터 | 발표에서 가능한 주장 | 신뢰도 | 발표에서 피할 주장 |
+| 항목 | 원시 데이터 | 데이터가 뒷받침하는 주장 | 신뢰도 | 데이터가 뒷받침하지 않는 주장 |
 |---|---|---|---|---|
 | 1-1 MIG/Non-MIG | 완결 CSV 4개 | 이 1회 실행에서 aggregate throughput이 +7.8% | 낮음~보통 | MIG latency가 309% 증가했다 / 일반적으로 더 빠르다 |
 | 1-2 간섭 | 완결 CSV·tegrastats | 이 1회 실행에서 1g 동시 부하 시 2g throughput -15.6%, p95 +23.3% | 보통 이하 | DRAM 경합이 원인으로 증명됐다 |
@@ -27,7 +27,7 @@ CUDA-event CSV와 throughput 계산은 재현 가능하다. 다만 MIG run은 1g
 
 비교 대상은 같은 2g worker이므로 latency·throughput 지표의 정의는 적절하다. -15.6% throughput과 +23.3% p95는 원시 CSV에서 재현된다. 그러나 단독 조건은 30초, 동시 조건은 과거 `SECONDS` 문제로 65초였고, 단독→동시 순서의 단일 반복이다. 온도·클럭 변화가 원인 일부일 수 있다.
 
-발표에서는 “동시 부하와 성능 저하가 함께 관찰됐다”라고만 말한다. 공유 DRAM 경합은 가설이며, 확정에는 수정된 `RUN_SECONDS` 스크립트로 조건별 최소 3회 반복과 tegrastats 시간축 비교가 필요하다.
+결론은 “동시 부하와 성능 저하가 함께 관찰됐다”로 제한한다. 공유 DRAM 경합은 가설이며, 확정에는 수정된 `RUN_SECONDS` 스크립트로 조건별 최소 3회 반복과 tegrastats 시간축 비교가 필요하다.
 
 ## 실험 1-3
 
@@ -46,7 +46,7 @@ MPS off run은 30초, on run은 63초였고 둘 다 한 번만 실행됐다. 이
 
 따라서 **이 정확한 workload·batch·1g 조건에서 MPS on이 throughput 이득을 주지 않았다는 관측**은 신뢰할 수 있다. 그러나 MPS server의 상태를 `get_server_list`로 보존하지 않았고 Nsight Systems kernel-overlap trace도 없으므로, 원인을 MPS 비동작·특정 scheduler 정책·일반 MPS 특성 중 하나로 단정할 수는 없다.
 
-## 발표 최종 권고
+## 해석 및 활용 권고
 
 주 결과는 1-2의 간섭 관측과 lightweight 3-1의 반복 MPS 결과로 구성한다. 1-1은 처리량 관측, 1-3은 안전하지 않은 fault injection의 교훈으로 보조 설명한다. 모든 수치에 대해 “이 장비와 이 workload에서”라는 범위를 유지한다.
 

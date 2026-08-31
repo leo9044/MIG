@@ -42,8 +42,6 @@ MPS on은 이 실행에서 throughput이 **6.6% 낮고**, 평균 latency는 약 
 4. 각 run의 tegrastats 온도·클럭·전력 로그를 표에 함께 기록한다.
 5. 각 worker에 NVTX range를 넣고 Nsight Systems에서 두 process kernel timeline이 실제 겹치는지 확인한다. overlap이 없으면 MPS 성능 결론 이전에 MPS 동작 설정을 점검해야 한다.
 
-## 결론과 발표 문장
+## 결론
 
-현재 결과는 “MPS가 항상 성능을 올린다”는 주장과 맞지 않는다. 그러나 기간 변수 버그와 순차 실행 조건 때문에 MPS 자체의 일반적 성능 결론으로 확정할 수 없다.
-
-> “현재 large-matmul/1g 조건에서는 MPS on이 6.6% 낮은 aggregate throughput을 보였습니다. 포화 workload와 실행 순서·열 상태를 통제한 반복 실험, 그리고 kernel overlap 타임라인 검증이 다음 단계입니다.”
+현재 결과는 MPS가 항상 성능을 올린다는 가설과 맞지 않는다. 그러나 기간 변수 버그와 순차 실행 조건 때문에 MPS 자체의 일반적 성능 결론으로 확정할 수 없다. 포화 workload와 실행 순서·열 상태를 통제한 반복 실험, 그리고 kernel overlap 타임라인 검증이 다음 단계다.

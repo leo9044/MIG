@@ -39,7 +39,7 @@
 2. 현재 MPS server 경로의 scheduling/IPC 비용 또는 이 Jetson MIG 구성의 제약이 짧은 kernel workload에서 크게 나타났다.
 3. MPS server가 시작됐다는 사실과 kernel이 시간축에서 실제 overlap했다는 사실은 다르다. 현재 CSV는 성능만 보여 주므로 overlap 여부는 확인하지 못한다.
 
-따라서 발표 결론은 “MPS가 성능을 높이지 못했다”가 아니라 **“이 경량 다중-worker 조건에서 반복 측정한 결과, MPS on의 성능상 이득은 관찰되지 않았고 오히려 일관된 손실이 관찰됐다”**가 적절하다.
+따라서 결론은 **이 경량 다중-worker 조건에서 반복 측정한 결과, MPS on의 성능상 이득은 관찰되지 않았고 오히려 일관된 손실이 관찰됐다**이다.
 
 ## 다음 검증
 
@@ -47,7 +47,3 @@
 2. MPS on 실행 중 `echo get_server_list | nvidia-cuda-mps-control`로 server가 활성인지 확인한다.
 3. 256·1024 matrix size 및 batch size 1·10·100을 바꿔, MPS에 유리한 커널 길이/제출 빈도 구간이 존재하는지 탐색한다.
 4. tegrastats 로그의 온도·클럭을 run별로 표에 추가해 thermal/power 원인을 분리한다.
-
-## 발표 문장
-
-“무거운 프로세스 두 개 대신 가벼운 CUDA worker 4개와 8개로 조건을 바꿔 각각 세 번 반복했습니다. 이 조건에서는 MPS on이 39% 낮은 처리량과 더 높은 batch latency를 보였습니다. MPS의 kernel overlap은 아직 trace로 검증해야 하므로, 현재 결론은 MPS 무효가 아니라 이 workload와 1g slice에서의 실측 성능 손실입니다.”

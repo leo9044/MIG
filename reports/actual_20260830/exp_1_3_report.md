@@ -24,9 +24,7 @@
 
 증명된 것은 **Jetson 호스트에서 OOM killer가 동작했다**는 사실이다. 증명되지 않은 것은 “1g CUDA OOM이 2g에 완전히 격리됐다”는 주장이다. 왜냐하면 1g 컨테이너의 정상적인 CUDA OOM 완료 기록이 없고, 호스트 서비스가 OOM killer로 종료됐기 때문이다.
 
-따라서 이 실험의 발표 자료는 성능 그래프가 아니라 journal 증거를 캡처해 다음처럼 제시하는 것이 정확하다.
-
-> “무한 CUDA 할당은 MIG slice 내부 실패로 제한되지 않고 Jetson UMA 호스트 OOM을 유발했습니다. 따라서 이 방식은 fault isolation 성공 검증이 아니라 안전하지 않은 fault injection 방식의 확인입니다.”
+따라서 이 실험은 성능 그래프보다 journal 증거로 기록하는 것이 정확하다. 무한 CUDA 할당은 MIG slice 내부 실패로 제한되지 않고 Jetson UMA 호스트 OOM을 유발했으므로, 이 방식은 fault isolation 성공 검증이 아니라 안전하지 않은 fault injection 방식의 확인이다.
 
 ## 캡처 명령
 

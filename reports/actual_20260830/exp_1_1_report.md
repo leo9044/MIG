@@ -34,7 +34,3 @@ worker별 p95 CUDA-event latency는 Non-MIG A/B가 0.286/0.288 ms, MIG 1g/2g가 
 ## 해석과 결론
 
 이 한 번의 실행에서는 MIG가 aggregate throughput을 소폭 높였다. latency는 동일한 자원 크기·동일 workload의 조건이 아니므로 이 실험에서 MIG/Non-MIG latency 우열을 주장할 수 없다.
-
-## 발표 문장
-
-“두 동시 작업의 총 처리량은 MIG에서 7.8% 높았습니다. 다만 1g·2g와 전체 GPU의 latency 분포는 직접 비교 가능한 동일 자원 조건이 아니므로, latency 우열은 이 실험에서 주장하지 않았습니다.”
